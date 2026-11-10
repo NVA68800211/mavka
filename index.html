@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MAVKA | Perfume & Care</title>
+
+    <!-- Определяем качество интернета ДО загрузки картинок.
+         net-slow  — слабая связь: без анимации отрыва.
+         net-awful — очень плохая связь (2G / экономия трафика): без фона-картинки и без логотипа. -->
+    <script>
+        (function () {
+            var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            var t = c && c.effectiveType;
+            var awful = !!c && (c.saveData || t === 'slow-2g' || t === '2g' || (c.downlink && c.downlink < 0.4));
+            var slow = awful || (!!c && (t === '3g' || (c.downlink && c.downlink < 1.2) || (c.rtt && c.rtt > 600)));
+            var d = document.documentElement;
+            if (awful) d.classList.add('net-awful');
+            if (slow) d.classList.add('net-slow');
+            window.__net = { awful: awful, slow: slow, imgSlow: false, logoPending: false };
+        })();
+    </script>
+
+    <!-- Шрифт Soyuz Grotesk: прямое подключение CSS с CDN (вместо сломанного @import) -->
+    <link rel="preconnect" href="https://fonts.cdnfonts.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/soyuz-grotesk" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.cdnfonts.com/css/soyuz-grotesk"></noscript>
+
+    <!-- Прелоадер клевера и верх страницы -->
+    <link rel="stylesheet" href="preloader.css">
+
+    <style>
+        :root {
+            --accent: #dedf8b;          /* пастельный оттенок: hover, фокус, клевер */
+            --ink: #1e272e;             /* глубокий тёмный текст */
+            --paper: #fefefe;           /* белое тело билета */
+            --notch: 11px;              /* радиус боковых вырезов */
+            --pad-x: clamp(14px, 5vw, 20px);
+            --radius: 28px;
+        }
+
+        * { -webkit-tap-highlight-color: transparent; }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: max(24px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+                     max(24px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            min-height: 100dvh;
+            box-sizing: border-box;
+            color: #2c3e50;
+            overflow-x: hidden;
+            background: #efefef;   /* запасной фон #efefef: виден, пока картинка грузится, и вместо неё на очень плохом интернете */
+        }
+
+        /* Фон-картинка (прямая ссылка). При очень плохом соединении (класс net-awful) не запрашивается */
+        html:not(.net-awful) body {
+            background: #efefef url('https://i.ibb.co/5XJhVR89/image.jpg') no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        /* iOS не поддерживает fixed-фон — там фон просто растягивается на всю страницу */
+        @supports (-webkit-touch-callout: none) {
+            html:not(.net-awful) body { background-attachment: scroll; }
+        }
+
+        /* ───────── БИЛЕТ ───────── */
+
+        /* Внешняя обёртка: ширина + мягкая тень по реальному силуэту билета (вместе с вырезами) */
+        .container {
+            width: 100%;
+            max-width: 430px;
+            min-width: 0;
+            margin: auto;
+            text-align: center;
+            box-sizing: border-box;
+            filter: drop-shadow(0 8px 18px rgba(30, 39, 46, 0.07));
+        }
+
+        /* Сцена для 3D-отрыва. overflow НЕ скрываем: вырезы делает mask, а не обрезка */
+        .ticket {
+            position: relative;
+            perspective: 900px;
+            perspective-origin: 50% 35%;
+        }
+
+        /* Секция билета. Белое тело + настоящие прозрачные вырезы через mask */
+        .seg {
+            position: relative;
+            background: var(--paper);
+            padding: 18px var(--pad-x);
+            box-sizing: border-box;
+            --cut-tl: radial-gradient(circle at 0 0,       #0000 calc(var(--notch) - .5px), #000 var(--notch));
+            --cut-tr: radial-gradient(circle at 100% 0,    #0000 calc(var(--notch) - .5px), #000 var(--notch));
+            --cut-bl: radial-gradient(circle at 0 100%,    #0000 calc(var(--notch) - .5px), #000 var(--notch));
+            --cut-br: radial-gradient(circle at 100% 100%, #0000 calc(var(--notch) - .5px), #000 var(--notch));
+        }
+
+        /* средние секции: вырезы сверху и снизу */
+        .seg {
+            -webkit-mask-image: var(--cut-tl), var(--cut-tr), var(--cut-bl), var(--cut-br);
+            mask-image: var(--cut-tl), var(--cut-tr), var(--cut-bl), var(--cut-br);
+            -webkit-mask-composite: source-in;
+            mask-composite: intersect;
+        }
+        /* первая секция: вырезы только снизу */
+        .seg--first {
+            border-radius: var(--radius) var(--radius) 0 0;
+            padding-top: 35px;
+            padding-bottom: 18px;
+            -webkit-mask-image: var(--cut-bl), var(--cut-br);
+            mask-image: var(--cut-bl), var(--cut-br);
+        }
+        /* последняя секция: вырезы только сверху */
+        .seg--last {
+            border-radius: 0 0 var(--radius) var(--radius);
+            padding-bottom: 30px;
+            -webkit-mask-image: var(--cut-tl), var(--cut-tr);
+            mask-image: var(--cut-tl), var(--cut-tr);
+        }
+
+        /* Пунктир перфорации. Он разрезан по шву на две половинки (верхнюю и нижнюю),
+           поэтому у оторванного кусочка остаётся ровный перфорированный край */
+        .seg:not(.seg--first)::before,
+        .seg:not(.seg--last)::after {
+            content: '';
+            position: absolute;
+            left: calc(var(--notch) + 8px);
+            right: calc(var(--notch) + 8px);
+            height: 2px;
+            background-size: 10px 100%;
+            background-repeat: repeat-x;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .seg:not(.seg--first)::before {
+            top: 0;
+            background-image: radial-gradient(circle at 50% 0, #a5b1c2 1.9px, transparent 2.4px);
+        }
+        .seg:not(.seg--last)::after {
+            bottom: 0;
+            background-image: radial-gradient(circle at 50% 100%, #a5b1c2 1.9px, transparent 2.4px);
+        }
+
+        /* ───────── ОТРЫВ ЧЕКА: лист плавно отгибается вправо, поднимается к экрану и заливает его белым ─────────
+           Всё происходит в отдельном слое .tear-world на весь экран: камера смотрит на билет сверху,
+           а оторванный лист взлетает к камере и «заклеивает» экран. */
+        .seg.is-torn { visibility: hidden; }
+
+        .tear-world {
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            overflow: hidden;
+            pointer-events: none;
+            perspective: 900px;
+            perspective-origin: 50% 50%;
+        }
+        .tear-wash { position: absolute; inset: 0; background: #fefefe; opacity: 0; }
+
+        .tear-stage {
+            position: absolute;
+            transform-style: preserve-3d;
+        }
+        .strip {
+            position: absolute;
+            left: 0;
+            top: 0;
+            transform-style: preserve-3d;
+            transform-origin: 100% 50%;
+            will-change: transform;
+        }
+        .face {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+        /* лёгкая тень на изгибе — как свет на настоящей бумаге */
+        .face::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: #1e272e;
+            opacity: var(--s, 0);
+            pointer-events: none;
+        }
+        .face.back { transform: rotateY(180deg); }
+        .face .mirror { position: absolute; inset: 0; transform: scaleX(-1); }
+
+        /* копия секции внутри полоски; нажатая кнопка остаётся цвета #dedf8b */
+        .tear-clone .link-btn { background-color: #dedf8b !important; transition: none; transform: none; box-shadow: none; }
+        /* спинка бумаги: тот же силуэт, но без содержимого */
+        .tear-back { background: #f4f4f0 !important; }
+        .tear-back > * { visibility: hidden; }
+
+        /* ───────── ТИПОГРАФИКА И КНОПКИ ───────── */
+
+        .category-title {
+            font-family: 'Tahoma', sans-serif !important;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #a5b1c2;
+            margin: 0px 0 6px 0 !important;
+            text-align: left;
+            padding-left: 5px;
+        }
+
+        .links-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 4px !important;
+        }
+
+        .link-btn {
+            font-family: 'Soyuz Grotesk', 'Arial Black', sans-serif !important;
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            padding: 16px 14px;
+            text-decoration: none;
+            text-align: center;
+            background-color: var(--paper);
+            color: var(--ink);
+            font-size: clamp(16px, 5.4vw, 20px);
+            font-weight: 600;
+            line-height: 1.25;
+            border-radius: 14px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow-wrap: anywhere;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            transition: background-color 0.3s ease, border-color 0.3s ease,
+                        box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        /* Первая буква каждой плашки — заглавная и чуть крупнее остальных (как «ВК» в ВКонтакте) */
+        .link-btn .vk-big,
+        .link-btn .cap { font-size: 1.25em; font-weight: 700; line-height: 0; }
+
+        /* Наведение курсора и тап: фон плавно становится #dedf8b, текст остаётся тёмным */
+        .link-btn:hover,
+        .link-btn:active {
+            background-color: #dedf8b !important;
+            color: #1e272e !important;
+            border-color: rgba(30, 39, 46, 0.12);
+        }
+        .link-btn:hover  { box-shadow: 0 8px 20px rgba(222, 223, 139, 0.45); transform: translateY(-2px); }
+        .link-btn:active { transform: translateY(1px); }
+        .link-btn:focus-visible,
+        .field:focus-visible {
+            outline: 2px solid var(--ink);
+            outline-offset: 2px;
+        }
+
+        .brand-title { font-family: 'Soyuz Grotesk', sans-serif; }
+
+        /* Логотип всегда строго в круге, даже если браузер плохо режет углы внутри mask/filter */
+        .avatar-logo-container {
+            clip-path: circle(50% at 50% 50%);
+            -webkit-clip-path: circle(50% at 50% 50%);
+        }
+        .shaik-img-logo { border-radius: 50%; }
+
+        /* ───────── ЭКОНОМИЯ ДВИЖЕНИЯ ───────── */
+        @media (prefers-reduced-motion: reduce) {
+            .link-btn { transition-duration: 0.01s; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Прелоадер клевера -->
+    <div id="preloader">
+        <div class="flower-container">
+            <div class="leaf-layer axis-1"><svg class="svg-heart" viewBox="0 0 32 32"><path d="M16 28.5S3 16.68 3 9.5A6.5 6.5 0 0 1 16 7.75 6.5 6.5 0 0 1 29 9.5c0 7.18-13 19-13 19z"/></svg></div>
+            <div class="leaf-layer axis-2"><svg class="svg-heart" viewBox="0 0 32 32"><path d="M16 28.5S3 16.68 3 9.5A6.5 6.5 0 0 1 16 7.75 6.5 6.5 0 0 1 29 9.5c0 7.18-13 19-13 19z"/></svg></div>
+            <div class="leaf-layer axis-3"><svg class="svg-heart" viewBox="0 0 32 32"><path d="M16 28.5S3 16.68 3 9.5A6.5 6.5 0 0 1 16 7.75 6.5 6.5 0 0 1 29 9.5c0 7.18-13 19-13 19z"/></svg></div>
+            <div class="leaf-layer axis-4"><svg class="svg-heart" viewBox="0 0 32 32"><path d="M16 28.5S3 16.68 3 9.5A6.5 6.5 0 0 1 16 7.75 6.5 6.5 0 0 1 29 9.5c0 7.18-13 19-13 19z"/></svg></div>
+            <div class="rolling-element"><svg class="svg-heart" style="opacity: 1;" viewBox="0 0 32 32"><path d="M16 28.5S3 16.68 3 9.5A6.5 6.5 0 0 1 16 7.75 6.5 6.5 0 0 1 29 9.5c0 7.18-13 19-13 19z"/></svg></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="ticket">
+
+            <!-- Секция 1: логотип и бренд -->
+            <section class="seg seg--first">
+                <div class="avatar-logo-container">
+                    <img class="shaik-img-logo" data-src="https://i.ibb.co/23dGJNFp/image.jpg" alt="">
+                    <noscript><img class="shaik-img-logo" src="https://i.ibb.co/23dGJNFp/image.jpg" alt=""></noscript>
+                </div>
+                <script>
+                    /* Логотип грузится сразу, но не при очень плохом интернете; появляется плавно */
+                    (function () {
+                        var img = document.querySelector('.shaik-img-logo'), net = window.__net;
+                        if (!img || net.awful) return;
+                        var t0 = performance.now();
+                        net.logoPending = true;
+                        img.style.opacity = '0';
+                        img.style.transition = 'opacity .4s ease';
+                        img.onload = function () {
+                            net.logoPending = false;
+                            if (performance.now() - t0 > 2500) net.imgSlow = true;   // грузился долго = слабая связь
+                            img.style.opacity = '';
+                        };
+                        img.onerror = function () { net.logoPending = false; net.imgSlow = true; };
+                        img.src = img.getAttribute('data-src');
+                    })();
+                </script>
+                <div class="brand-header-group">
+                    <div class="brand-title">MAVKA</div>
+                    <div class="brand-subtitle">perfume & care</div>
+                </div>
+            </section>
+
+            <!-- Секция 2: соцсети (эта секция «отрывается» по клику на кнопку VK) -->
+            <section class="seg" id="tear-section">
+                <div class="category-title">Мы в соцсетях</div>
+                <div class="links-wrapper">
+                    <a href="https://vk.ru/53shaik" id="vk-link" class="link-btn" data-tear>👥 <span class="cap">Г</span>руппа <span class="vk-big">ВК</span>онтакте</a>
+                </div>
+            </section>
+
+            <!-- Секция 3: связь -->
+            <section class="seg">
+                <div class="category-title">Быстрая связь</div>
+                <div class="links-wrapper">
+                    <a href="tel:+79116289406" class="link-btn">📞 <span class="cap">П</span>озвонить нам</a>
+                </div>
+            </section>
+
+            <!-- Секция 4: адрес -->
+            <section class="seg seg--last">
+                <div class="category-title">Где мы находимся</div>
+                <div class="links-wrapper">
+                    <a href="maps.html" target="_blank" rel="noopener" class="link-btn" data-tear>📍 <span class="cap">М</span>ы на картах</a>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script>
+        /* ───────── Прелоадер: скрытие через 2200 мс ───────── */
+        setTimeout(function () {
+            document.getElementById('preloader').classList.add('hide');
+        }, 2200);
+
+        /* ───────── Отрыв секции по клику на кнопку с атрибутом data-tear ───────── */
+        (function () {
+            var busy = false, gone = false, world = null;
+            var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            var N = 40;                       // на сколько тонких полосок режем секцию (больше = глаже изгиб)
+            var K = 12;                       // сколько полосок занимает дуга изгиба (радиус изгиба)
+            var DTH = Math.PI / K;            // угол между соседними полосками внутри дуги
+            var PEEL_MS = 1150;               // отгиб листа слева направо
+            var LIFT_AT = 650;                // когда лист начинает подниматься к экрану
+            var LIFT_MS = 1000;               // сколько он поднимается и заливает экран белым
+            var TZ = 760;                     // как близко к «глазам» подлетает лист (камера на 900)
+
+            function go(href) {
+                if (gone) return;
+                gone = true;
+                window.location.href = href;   // в той же вкладке: так переход не блокируют браузеры
+            }
+
+            // Слабый интернет (или логотип ещё не догрузился) — анимация не нужна, идём сразу
+            function connectionIsWeak() {
+                var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (c) {
+                    var t = c.effectiveType;
+                    if (c.saveData || t === 'slow-2g' || t === '2g' || t === '3g' ||
+                        (c.downlink && c.downlink < 1.2) || (c.rtt && c.rtt > 600)) return true;
+                }
+                var n = window.__net || {};
+                return !!(n.imgSlow || n.logoPending);
+            }
+
+            function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+            function run(link, section) {
+                var rect = section.getBoundingClientRect();
+                var W = rect.width, H = rect.height, w = W / N, ws = w + 0.6;
+                var strips = [], xs = [];
+
+                // Полоска j (j = 0 — самая правая). Лицевая сторона — копия секции, показывающая свой кусок.
+                function makeFace(j, back) {
+                    var face = document.createElement('div');
+                    face.className = 'face ' + (back ? 'back' : 'front');
+                    var clone = section.cloneNode(true);
+                    clone.removeAttribute('id');
+                    [].forEach.call(clone.querySelectorAll('[id]'), function (el) { el.removeAttribute('id'); });
+                    clone.classList.add('tear-clone');
+                    clone.style.cssText = 'position:absolute;margin:0;top:0;width:' + W + 'px;height:' + H +
+                                          'px;left:' + (-(N - 1 - j) * w) + 'px;';
+                    // боковые вырезы-«укусы» нужны только крайним полоскам — остальным маска не нужна
+                    if (j > 1 && j < N - 2) {
+                        clone.style.webkitMaskImage = 'none';
+                        clone.style.maskImage = 'none';
+                    }
+                    if (back) {
+                        clone.classList.add('tear-back');
+                        var mirror = document.createElement('div');
+                        mirror.className = 'mirror';
+                        mirror.appendChild(clone);
+                        face.appendChild(mirror);
+                    } else {
+                        face.appendChild(clone);
+                    }
+                    return face;
+                }
+
+                /* Положение всех полосок при прогрессе отрыва u (0…1).
+                   Правая часть билета ещё приклеена и лежит ровно. Левее неё идёт дуга из K полосок:
+                   каждая чуть повёрнута относительно соседней, вместе они дают плавный изгиб на 180°.
+                   Дуга бежит слева направо, а за ней бумага лежит спинкой к нам. */
+                function pose(u) {
+                    var a = (N - 1) * (1 - u);          // граница «приклеено / оторвано»
+                    var X = W, Z = 0, th = 0;
+                    for (var j = 0; j < N; j++) {
+                        if (j > 0) th += DTH * clamp(j - a, 0, 1) * clamp(a + K - j + 1, 0, 1);
+                        var el = strips[j];
+                        el.style.transform = 'translate3d(' + (X - ws).toFixed(2) + 'px,0,' + Z.toFixed(2) +
+                                             'px) rotateY(' + th.toFixed(4) + 'rad)';
+                        el.style.setProperty('--s', (j > 1 && j < N - 2) ? (0.07 * Math.abs(Math.sin(th))).toFixed(3) : '0');
+                        xs[j] = X;
+                        X -= w * Math.cos(th);
+                        Z += w * Math.sin(th);
+                    }
+                    return a;
+                }
+
+                // слой на весь экран: камера смотрит сверху на билет
+                world = document.createElement('div');
+                world.className = 'tear-world';
+                var stage = document.createElement('div');
+                stage.className = 'tear-stage';
+                stage.style.cssText = 'left:' + rect.left + 'px;top:' + rect.top + 'px;width:' + W + 'px;height:' + H + 'px;';
+                for (var j = 0; j < N; j++) {
+                    var strip = document.createElement('div');
+                    strip.className = 'strip';
+                    strip.style.width = ws + 'px';
+                    strip.style.height = H + 'px';
+                    strip.appendChild(makeFace(j, false));
+                    strip.appendChild(makeFace(j, true));
+                    stage.appendChild(strip);
+                    strips.push(strip);
+                }
+                var wash = document.createElement('div');
+                wash.className = 'tear-wash';
+                world.appendChild(stage);
+                world.appendChild(wash);
+
+                // Куда лист должен подлететь: центр оторванной части уходит в центр экрана
+                pose(1);
+                var jm = clamp(Math.round((K + N - 1) / 2), 0, N - 1);
+                var cx = rect.left + xs[jm] - w / 2, cy = rect.top + H / 2;
+                var tx = window.innerWidth / 2 - cx, ty = window.innerHeight / 2 - cy;
+                pose(0);
+
+                document.body.appendChild(world);
+                section.classList.add('is-torn');
+
+                var start = null, finished = false;
+                function frame(ts) {
+                    if (start === null) start = ts;
+                    var t = ts - start;
+
+                    // 1) плавный отгиб слева направо
+                    var p = clamp(t / PEEL_MS, 0, 1);
+                    pose(0.5 - 0.5 * Math.cos(Math.PI * p));
+
+                    // 2) оторванный лист поднимается к «глазам», растёт и заклеивает экран
+                    var tl = clamp((t - LIFT_AT) / LIFT_MS, 0, 1);
+                    var L = Math.pow(tl, 2.2);
+                    stage.style.transform = 'translate3d(' + (L * tx).toFixed(1) + 'px,' + (L * ty).toFixed(1) +
+                                            'px,' + (L * TZ).toFixed(1) + 'px)';
+
+                    // 3) экран плавно становится белым и мы переходим по ссылке
+                    wash.style.opacity = clamp((L - 0.45) / 0.5, 0, 1).toFixed(3);
+
+                    if (tl < 1) { requestAnimationFrame(frame); }
+                    else if (!finished) { finished = true; setTimeout(function () { go(link.href); }, 60); }
+                }
+                requestAnimationFrame(frame);
+                setTimeout(function () { go(link.href); }, 4500);   // страховка
+            }
+
+            [].forEach.call(document.querySelectorAll('[data-tear]'), function (link) {
+                link.addEventListener('click', function (e) {
+                    // пустая ссылка (пока не вписана) — ведём себя как обычно
+                    if (!link.getAttribute('href')) return;
+                    // Ctrl/Cmd/Shift-клик и средняя кнопка работают как обычная ссылка
+                    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    if (busy) return;
+                    busy = true;
+
+                    if (reduceMotion || connectionIsWeak()) { go(link.href); return; }
+                    run(link, link.closest('.seg'));
+                });
+            });
+
+            // Возврат кнопкой «Назад» (bfcache): собираем билет обратно
+            window.addEventListener('pageshow', function (e) {
+                if (e.persisted) {
+                    if (world && world.parentNode) world.parentNode.removeChild(world);
+                    [].forEach.call(document.querySelectorAll('.seg.is-torn'), function (el) { el.classList.remove('is-torn'); });
+                    busy = false;
+                    gone = false;
+                }
+            });
+        })();
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MAVKA | Как нас найти</title>
+
+    <!-- Определяем качество интернета ДО загрузки картинок.
+         net-slow  — слабая связь: значки не летают, следов нет.
+         net-awful — совсем плохая связь (2G / экономия трафика): значки не грузятся вообще. -->
+    <script>
+        (function () {
+            var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            var t = c && c.effectiveType;
+            var awful = !!c && (c.saveData || t === 'slow-2g' || t === '2g' || (c.downlink && c.downlink < 0.4));
+            var slow = awful || (!!c && (t === '3g' || (c.downlink && c.downlink < 1.2) || (c.rtt && c.rtt > 600)));
+            var d = document.documentElement;
+            if (awful) d.classList.add('net-awful');
+            if (slow) d.classList.add('net-slow');
+            window.__net = { awful: awful, slow: slow, imgSlow: false };
+        })();
+    </script>
+
+    <!-- Шрифт Soyuz Grotesk: прямое подключение CSS с CDN (вместо сломанного @import) -->
+    <link rel="preconnect" href="https://fonts.cdnfonts.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/soyuz-grotesk" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.cdnfonts.com/css/soyuz-grotesk"></noscript>
+
+    <style>
+        :root {
+            --accent: #dedf8b;                          /* тот самый «красивый зелёный» при наведении */
+            --ink: #1e272e;
+            --s: clamp(70px, 21vw, 100px);              /* базовый размер значка (зависит от ширины экрана) */
+            --cpad: clamp(16px, 5vw, 24px);             /* внутренний отступ карточки */
+        }
+
+        * { -webkit-tap-highlight-color: transparent; }
+
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: hidden; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Тот самый чистый светлый оттенок #efefef */
+            background-color: #efefef;
+            margin: 0;
+            /* по бокам оставляем место, чтобы увеличенные значки не уходили за экран */
+            padding: max(40px, env(safe-area-inset-top)) calc(var(--s) * 0.55 + 6px)
+                     max(40px, env(safe-area-inset-bottom));
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        /* Общий контейнер для карточки и летающего 3D-декора */
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 430px;
+        }
+
+        /* Главная белая карточка-билет.
+           overflow НЕ скрываем: значки привязаны к её секциям и выходят за края.
+           Боковые вырезы обрезаются самой линией перфорации (см. ниже). */
+        .container {
+            width: 100%;
+            background: #ffffff;
+            padding: 44px var(--cpad);
+            border-radius: 28px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.03);
+            box-sizing: border-box;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Верхний заголовок */
+        .brand-header-group {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .brand-title {
+            font-family: 'Soyuz Grotesk', 'Arial Black', sans-serif;
+            font-size: clamp(24px, 7.4vw, 32px);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--ink);
+            margin: 0;
+        }
+
+        /* Линия перфорации с «укусами» по краям. Две линии = четыре выреза */
+        .ticket-perforation {
+            display: block;
+            height: 24px;
+            margin: 16px calc(var(--cpad) * -1) !important;
+            position: relative;
+            background: transparent;
+            overflow: hidden;              /* обрезает вырезы ровно по краю карточки */
+        }
+
+        .ticket-perforation::before {
+            content: '';
+            position: absolute;
+            left: var(--cpad);
+            right: var(--cpad);
+            top: 50%;
+            transform: translateY(-50%);
+            height: 2px;
+            background-image: linear-gradient(to right, #a5b1c2 35%, transparent 35%);
+            background-size: 8px 2px;
+            background-repeat: repeat-x;
+            opacity: 0.3;
+        }
+
+        /* Вырезы сливаются с фоном #efefef */
+        .ticket-perforation::after, .ticket-perforation-right {
+            content: '';
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #efefef;
+            border-radius: 50%;
+        }
+        .ticket-perforation::after { left: 0; }
+        .ticket-perforation-right { right: -20px; }
+
+        /* Блок с кнопками-плашками (от него отсчитываются значки карт) */
+        .links-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Стиль плашек выбора: текст строго по центру */
+        .link-btn {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 8px;
+            padding: 18px 10px;
+            text-decoration: none;
+            background: #ffffff;
+            color: var(--ink);
+            font-size: clamp(12px, 3.5vw, 16px);   /* подпись подстраивается под ширину экрана */
+            font-weight: 700;
+            line-height: 1.25;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.01);
+            transition: background-color 0.3s ease, border-color 0.3s ease,
+                        box-shadow 0.3s ease, transform 0.3s ease;
+            cursor: pointer;
+            box-sizing: border-box;
+            min-width: 0;
+        }
+
+        /* Иконка-пин внутри плашки */
+        .link-btn::before {
+            content: '📍';
+            font-size: 14px;
+        }
+
+        /* Подпись целиком одним блоком, чтобы flex не разрывал слова */
+        .link-btn .label { display: inline-block; text-wrap: balance; }
+        /* 2GIS: заглавные и крупнее */
+        .link-btn .big {
+            font-size: 1.25em;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            line-height: 1;
+                }
+        /* Яндекс Карты / Google Maps: первые буквы крупнее */
+        .link-btn .cap {
+            font-size: 1.25em;
+            line-height: 1;
+                   }
+
+        /* Наведение и тап: тот же красивый #dedf8b, что и на основном сайте, текст остаётся тёмным */
+        .link-btn:hover,
+        .link-btn:focus-visible,
+        .link-btn:active {
+            background-color: #dedf8b !important;
+            color: #1e272e !important;
+            border-color: rgba(30, 39, 46, 0.12);
+        }
+        .link-btn:hover,
+        .link-btn:focus-visible {
+            box-shadow: 0 8px 20px rgba(222, 223, 139, 0.45);
+            transform: translateY(-2px);
+            outline: none;
+        }
+        .link-btn:active { transform: translateY(1px); }
+
+        /* Нижнее окошко с адресом */
+        .address-block {
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 16px;
+            padding: 16px 20px;
+            text-align: center;
+            border: 1px dashed rgba(0, 0, 0, 0.08);
+        }
+
+        .address-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #a5b1c2;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .address-text {
+            font-size: 14px;
+            color: #2f3640;
+            line-height: 1.4;
+            font-weight: 600;
+        }
+
+        /* ==========================================================================
+           ЗНАЧКИ: плавное парение (+ 3D-разворот у значков карт)
+           Три слоя, чтобы анимации не перебивали друг друга:
+           .decor-container — место на странице,
+           .decor-float     — плавное парение (translate + rotate),
+           .decor-card      — разворот на 180° при наведении (только у .flip).
+           Значки карт привязаны к блоку кнопок, поэтому не закрывают вырезы на линиях.
+           ========================================================================== */
+        .decor-container {
+            position: absolute;
+            width: var(--s);
+            height: var(--s);
+            z-index: 3;                /* все значки поверх белой карточки */
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+        .decor-container.is-ready { opacity: 1; }
+
+        .decor-float {
+            width: 100%;
+            height: 100%;
+            perspective: 600px;
+            will-change: translate, rotate;
+            /* две независимые медленные волны с разным периодом — движение выглядит живым, без рывков */
+            animation:
+                drift  var(--dur, 7s)  ease-in-out var(--del, 0s) infinite alternate,
+                sway   var(--rdur, 9s) ease-in-out var(--del, 0s) infinite alternate;
+        }
+
+        .decor-card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.85s cubic-bezier(0.45, 0.05, 0.2, 1);
+            will-change: transform;
+        }
+
+        .face {
+            position: absolute;
+            inset: 0;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .face img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.08));
+            -webkit-user-drag: none;
+        }
+        .face.back { transform: rotateY(180deg); }
+
+        @keyframes drift {
+            from { translate: 0 0; }
+            to   { translate: var(--ax, 6px) var(--ay, -12px); }
+        }
+        @keyframes sway {
+            from { rotate: var(--r0, -3deg); }
+            to   { rotate: var(--r1, 4deg); }
+        }
+
+        /* Позиции (размеры считаются от --s, то есть от ширины экрана).
+           Значки внутри блока кнопок сдвигаем ещё на --cpad, чтобы они стояли от края карточки. */
+
+        /* i1 — Клевер, левый верхний угол карточки (не меняется) */
+        .i1 { width: calc(var(--s) * 1.1);  height: calc(var(--s) * 1.1);
+              top: calc(var(--s) * -0.35);  left: calc(var(--s) * -0.38);
+              --dur: 7.5s; --rdur: 10s; --del: 0s;     --ax: 5px;  --ay: -11px; --r0: -4deg; --r1: 3deg; }
+
+        /* i2 — 2ГИС, слева у кнопок, крупнее остальных (меняется) */
+        .i2 { width: calc(var(--s) * 1.2); height: calc(var(--s) * 1.2);
+              top: 2px; left: calc(var(--cpad) * -1 - var(--s) * 0.55);
+              --dur: 8.5s; --rdur: 11s; --del: -2s;    --ax: -6px; --ay: -13px; --r0: 3deg;  --r1: -4deg; }
+
+        /* i3 — Яндекс, справа вверху у кнопок (меняется) */
+        .i3 { top: 0; right: calc(var(--cpad) * -1 - var(--s) * 0.42);
+              --dur: 6.5s; --rdur: 9s;  --del: -3.5s;  --ax: 7px;  --ay: -10px; --r0: -3deg; --r1: 5deg; }
+
+        /* i4 — Плюс, слева на уровне кнопки Google, как и был (не меняется) */
+        .i4 { width: calc(var(--s) * 0.88); height: calc(var(--s) * 0.88);
+              bottom: -8px; left: calc(var(--cpad) * -1 - var(--s) * 0.4);
+              --dur: 9s;   --rdur: 12s; --del: -5s;    --ax: 5px;  --ay: -12px; --r0: 4deg;  --r1: -3deg; }
+
+        /* i5 — Google, справа внизу у кнопок (меняется) */
+        .i5 { bottom: -2px; right: calc(var(--cpad) * -1 - var(--s) * 0.42);
+              --dur: 7s;   --rdur: 10.5s; --del: -1s;  --ax: -5px; --ay: -11px; --r0: -4deg; --r1: 4deg; }
+
+        /* i6 — дополнительный клевер, правый верхний угол карточки (не меняется) */
+        .i6 { width: calc(var(--s) * 0.8);  height: calc(var(--s) * 0.8);
+              top: calc(var(--s) * -0.3);   right: calc(var(--s) * -0.34);
+              --dur: 8s;   --rdur: 11.5s; --del: -2.5s; --ax: -5px; --ay: -10px; --r0: 5deg; --r1: -3deg; }
+
+        /* i7 — дополнительный клевер, правый нижний угол карточки, чуть приподнят (не меняется) */
+        .i7 { width: calc(var(--s) * 0.8);  height: calc(var(--s) * 0.8);
+              bottom: calc(var(--s) * -0.14); right: calc(var(--s) * -0.36);
+              --dur: 9.5s; --rdur: 10s;  --del: -4s;   --ax: 5px;  --ay: -9px;  --r0: -5deg; --r1: 3deg; }
+
+        /* Совсем плохой интернет: значков нет вообще. Слабый интернет / «меньше движения»: значки стоят на месте */
+        html.net-awful .decor-container { display: none; }
+        html.net-slow .decor-float { animation: none; }
+        @media (prefers-reduced-motion: reduce) {
+            .decor-float { animation: none; }
+            .decor-card, .link-btn { transition-duration: 0.01s; }
+        }
+
+        /* ==========================================================================
+           СЛЕДЫ НА ФОНЕ: обувь, птичьи лапки, кошачьи лапки, копыта.
+           Длина троп и их количество считаются от размера экрана (в скрипте).
+           Появляются цепочкой и плавно тают. Только при хорошем интернете.
+           ========================================================================== */
+        .trails {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .print {
+            position: absolute;
+            color: #6f7a85;
+            opacity: 0;
+            animation: printLife var(--life, 5200ms) ease-in-out both;
+        }
+        .print svg { display: block; }
+        @keyframes printLife {
+            0%   { opacity: 0; }
+            18%  { opacity: 0.24; }
+            60%  { opacity: 0.24; }
+            100% { opacity: 0; }
+        }
+        html.net-slow .trails, html.net-awful .trails { display: none; }
+        @media (prefers-reduced-motion: reduce) { .trails { display: none; } }
+    </style>
+</head>
+<body>
+
+    <!-- Формы следов (рисуются прямо в коде, из интернета ничего не грузится) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <!-- подошва человека -->
+        <symbol id="p-shoe" viewBox="0 0 20 35">
+            <path fill="currentColor" d="M10 1c4.6 0 7.5 5 7.5 12 0 4.5-2 7.5-3.5 9H6C4.5 20.5 2.5 17.5 2.5 13 2.5 6 5.4 1 10 1z"/>
+            <path fill="currentColor" d="M6.5 25.5c0-1.2 1.6-1.8 3.5-1.8s3.5.6 3.5 1.8c0 3-.8 8.5-3.5 8.5s-3.5-5.5-3.5-8.5z"/>
+        </symbol>
+        <!-- птичья лапка -->
+        <symbol id="p-bird" viewBox="0 0 24 24">
+            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 15V2M12 15L4 7M12 15L20 7M12 15v7"/>
+        </symbol>
+        <!-- кошачья лапка -->
+        <symbol id="p-cat" viewBox="0 0 24 24">
+            <ellipse fill="currentColor" cx="12" cy="17" rx="5.5" ry="4.5"/>
+            <circle fill="currentColor" cx="5.5" cy="11" r="2.2"/>
+            <circle fill="currentColor" cx="9.5" cy="6.5" r="2.3"/>
+            <circle fill="currentColor" cx="14.5" cy="6.5" r="2.3"/>
+            <circle fill="currentColor" cx="18.5" cy="11" r="2.2"/>
+        </symbol>
+        <!-- раздвоенное копыто -->
+        <symbol id="p-hoof" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M10 3c-3 0-5 4-5 9s1.5 8 4 9c1 .4 1.5-.5 1.5-1.5V5c0-1.2-.2-2-.5-2z"/>
+            <path fill="currentColor" d="M14 3c3 0 5 4 5 9s-1.5 8-4 9c-1 .4-1.5-.5-1.5-1.5V5c0-1.2.2-2 .5-2z"/>
+        </symbol>
+    </svg>
+
+    <div class="trails" id="trails" aria-hidden="true"></div>
+
+    <div class="page-wrapper">
+
+        <!-- Основной контент карточки. Значки лежат внутри секций, к которым привязаны.
+             Прямые ссылки лежат в data-src: так на совсем плохом интернете они вообще не запрашиваются -->
+        <div class="container">
+
+            <!-- i1: клевер (не меняется) -->
+            <div class="decor-container i1" aria-hidden="true">
+                <div class="decor-float"><div class="decor-card">
+                    <div class="face front"><img data-src="https://i.ibb.co/HpDCHxXK/image.png" alt=""></div>
+                </div></div>
+            </div>
+
+            <!-- i6: доп. клевер (не меняется) -->
+            <div class="decor-container i6" aria-hidden="true">
+                <div class="decor-float"><div class="decor-card">
+                    <div class="face front"><img data-src="https://i.ibb.co/HpDCHxXK/image.png" alt=""></div>
+                </div></div>
+            </div>
+
+            <!-- i7: доп. клевер (не меняется) -->
+            <div class="decor-container i7" aria-hidden="true">
+                <div class="decor-float"><div class="decor-card">
+                    <div class="face front"><img data-src="https://i.ibb.co/HpDCHxXK/image.png" alt=""></div>
+                </div></div>
+            </div>
+
+            <div class="brand-header-group">
+                <h1 class="brand-title">мы на картах</h1>
+            </div>
+
+            <!-- ЛИНИЯ 1 -->
+            <div class="ticket-perforation"><div class="ticket-perforation-right"></div></div>
+
+            <!-- СПИСОК КАРТ. data-logo — картинка, в которую превращаются значки карт при наведении -->
+            <div class="links-wrapper">
+
+                <!-- i4: плюсик (не меняется), слева на уровне кнопки Google -->
+                <div class="decor-container i4" aria-hidden="true">
+                    <div class="decor-float"><div class="decor-card">
+                        <div class="face front"><img data-src="https://i.ibb.co/hxLq6kHY/image.png" alt=""></div>
+                    </div></div>
+                </div>
+
+                <!-- i2: 2ГИС (меняется) -->
+                <div class="decor-container i2 flip" aria-hidden="true">
+                    <div class="decor-float"><div class="decor-card">
+                        <div class="face front"><img data-src="https://i.ibb.co/Q77zjGT3/2.png" alt=""></div>
+                        <div class="face back"><img data-src="https://i.ibb.co/Q77zjGT3/2.png" alt=""></div>
+                    </div></div>
+                </div>
+
+                <!-- i3: Яндекс (меняется) -->
+                <div class="decor-container i3 flip" aria-hidden="true">
+                    <div class="decor-float"><div class="decor-card">
+                        <div class="face front"><img data-src="https://i.ibb.co/Dg70qRtT/image.png" alt=""></div>
+                        <div class="face back"><img data-src="https://i.ibb.co/Dg70qRtT/image.png" alt=""></div>
+                    </div></div>
+                </div>
+
+                <!-- i5: Google (меняется) -->
+                <div class="decor-container i5 flip" aria-hidden="true">
+                    <div class="decor-float"><div class="decor-card">
+                        <div class="face front"><img data-src="https://i.ibb.co/FLQVkh8W/image.png" alt=""></div>
+                        <div class="face back"><img data-src="https://i.ibb.co/FLQVkh8W/image.png" alt=""></div>
+                    </div></div>
+                </div>
+
+                <a href="https://2gis.ru/v_novgorod/firm/70000001055777102?m=31.235505%2C58.531176%2F18.86" target="_blank" rel="noopener" class="link-btn" data-type="2gis"
+                   data-logo="https://i.ibb.co/Q77zjGT3/2.png"><span class="label">открыть в <span class="big">2GIS</span></span></a>
+                <a href="https://yandex.ru/maps/org/shaik_53/170111741897/?ll=31.235458%2C58.531254&z=15" target="_blank" rel="noopener" class="link-btn" data-type="yandex"
+                   data-logo="https://i.ibb.co/Dg70qRtT/image.png"><span class="label">открыть в <span class="cap">Я</span>ндекс <span class="cap">К</span>арты</span></a>
+                <a href="https://www.google.ru/maps/@58.5311487,31.2354546,64m/data=!3m1!1e3?hl=ru&entry=ttu&g_ep=EgoyMDI2MTEwOC4wIKXMDSoASAFQAw%3D%3D" target="_blank" rel="noopener" class="link-btn" data-type="google"
+                   data-logo="https://i.ibb.co/FLQVkh8W/image.png"><span class="label">открыть в <span class="cap">G</span>oogle <span class="cap">M</span>aps</span></a>
+            </div>
+
+            <!-- ЛИНИЯ 2 -->
+            <div class="ticket-perforation"><div class="ticket-perforation-right"></div></div>
+
+            <!-- БЛОК С АДРЕСОМ -->
+            <div class="address-block">
+                <div class="address-title">Наш адрес</div>
+                <div class="address-text">
+                    г. Великий Новгород, проспект Мира, д. 21,        
+корпус 1 (мини-рынок «Западный»)
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var net = window.__net || {};
+            var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var DUR = 850, STAGGER = 50;        // длительность разворота и «волна» между значками, мс
+
+            function rnd(a, b) { return a + Math.random() * (b - a); }
+
+            var all = [].slice.call(document.querySelectorAll('.decor-container'));
+            // крутятся только значки карт; клевер и плюсик никогда не меняются
+            var flips = all.filter(function (c) { return c.classList.contains('flip'); });
+            var cards = flips.map(function (c) { return c.querySelector('.decor-card'); });
+            var faces = cards.map(function (c) { return [c.querySelector('.front img'), c.querySelector('.back img')]; });
+            var originals = faces.map(function (f) { return f[0].getAttribute('data-src'); });
+
+            /* ───── Загрузка значков (не грузим при совсем плохом интернете) ───── */
+            if (!net.awful) {
+                all.forEach(function (box) {
+                    var t0 = performance.now();
+                    var imgs = [].slice.call(box.querySelectorAll('img[data-src]'));
+                    imgs[0].onload = function () {
+                        if (performance.now() - t0 > 2500) net.imgSlow = true;   // грузились долго = слабая связь
+                        box.classList.add('is-ready');
+                    };
+                    imgs.forEach(function (img) { img.src = img.getAttribute('data-src'); });
+                });
+                // заранее прогреваем логотипы карт, чтобы при развороте они уже были в кэше
+                [].forEach.call(document.querySelectorAll('.link-btn[data-logo]'), function (b) {
+                    new Image().src = b.getAttribute('data-logo');
+                });
+            }
+
+            /* Можно ли крутить значки.
+               Раньше разворот выключался по оценке скорости связи (в том числе «картинки грузились долго»),
+               и после первого круга значки переставали крутиться. Теперь вращение зависит только от того,
+               загрузились ли сами значки: сам разворот трафика не требует. */
+            function canFlip() {
+                if (!flips.length || reduceMotion || net.awful) return false;
+                return faces.every(function (f) { return f[0].complete && f[0].naturalWidth > 0; });
+            }
+
+            /* ───── Разворот: значки карт одновременно превращаются в логотип выбранной карты ─────
+               Каждый разворот всегда +180° в одну сторону, а новая картинка ставится на ту сторону,
+               которая сейчас скрыта, поэтому подмены не видно. */
+            var angle = 0, current = null, desired = null, busy = false, locked = false;
+            var waiters = [], leaveTimer = null, gone = false;
+
+            function logoFor(type) {
+                var b = document.querySelector('.link-btn[data-type="' + type + '"]');
+                return b ? b.getAttribute('data-logo') : null;
+            }
+
+            function settle() {
+                if (busy || current !== desired) return;
+                var list = waiters; waiters = [];
+                list.forEach(function (fn) { fn(); });
+            }
+
+            function step() {
+                if (busy) return;
+                if (current === desired) { settle(); return; }
+                busy = true;
+                current = desired;
+                var hidden = (angle / 180 + 1) % 2;               // сторона, которая станет видимой после разворота
+                var url = current ? logoFor(current) : null;
+                cards.forEach(function (card, i) {
+                    faces[i][hidden].src = url || originals[i];
+                });
+                angle += 180;
+                cards.forEach(function (card, i) {
+                    card.style.transitionDelay = (i * STAGGER) + 'ms';
+                    card.style.transform = 'rotateY(' + angle + 'deg)';
+                });
+                setTimeout(function () {
+                    busy = false;
+                    step();
+                }, DUR + (cards.length - 1) * STAGGER + 30);
+            }
+
+            function setDesired(type) {
+                if (locked) return;
+                if (type && !canFlip()) return;   // «вернуть как было» разрешено всегда, чтобы значки не застревали
+                desired = type;
+                step();
+            }
+
+            function go(href) {
+                if (gone) return;
+                gone = true;
+                window.location.href = href;
+            }
+
+            [].forEach.call(document.querySelectorAll('.link-btn'), function (btn) {
+                var type = btn.getAttribute('data-type');
+
+                function enter() { clearTimeout(leaveTimer); setDesired(type); }
+                function leave() {
+                    clearTimeout(leaveTimer);
+                    // небольшая пауза: при переходе с кнопки на кнопку значки не дёргаются туда-сюда
+                    leaveTimer = setTimeout(function () { setDesired(null); }, 90);
+                }
+
+                btn.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') enter(); });
+                btn.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') leave(); });
+                btn.addEventListener('focus', enter);
+                btn.addEventListener('blur', leave);
+
+                btn.addEventListener('click', function (e) {
+                    // Ctrl/Cmd/Shift-клик и средняя кнопка работают как обычная ссылка
+                    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    if (!canFlip()) { go(btn.href); return; }
+
+                    clearTimeout(leaveTimer);
+                    locked = false;
+                    setDesired(type);
+                    locked = true;                       // дальше значки не трогаем, ждём конца разворота
+                    waiters.push(function () { setTimeout(function () { go(btn.href); }, 220); });
+                    settle();
+                });
+            });
+
+            // Возврат кнопкой «Назад» (bfcache): значки снова становятся обычными
+            window.addEventListener('pageshow', function (e) {
+                if (e.persisted) {
+                    gone = false;
+                    locked = false;
+                    waiters = [];
+                    desired = null;
+                    step();
+                }
+            });
+
+            /* ───── Следы на сером фоне ─────
+               Несколько независимых «прохожих»: каждый оставляет цепочку маленьких следов,
+               они плавно проявляются и тают. Работает только при хорошем интернете.
+               Длина тропы и число «прохожих» считаются от размера экрана, размер самих следов фиксированный. */
+            var KINDS = [
+                { sym: 'p-shoe', w: 12, h: 21, stride: 34, side: 9, step: 820, min: 7, max: 22 },   // человек
+                { sym: 'p-bird', w: 14, h: 14, stride: 15, side: 5, step: 360, min: 9, max: 28 },   // птица
+                { sym: 'p-cat',  w: 12, h: 12, stride: 17, side: 6, step: 520, min: 8, max: 24 },   // кошка
+                { sym: 'p-hoof', w: 13, h: 13, stride: 26, side: 9, step: 700, min: 7, max: 20 }    // копытное
+            ];
+            var LIFE = 5200;
+
+            function spawnTrail(layer) {
+                var k = KINDS[Math.floor(Math.random() * KINDS.length)];
+                var vw = window.innerWidth, vh = window.innerHeight;
+                var w = k.w, h = k.h, stride = k.stride, side = k.side;           // размер следов фиксированный, как раньше
+
+                // длина тропы — доля диагонали экрана: на большом экране тропа длиннее
+                var len = rnd(0.35, 0.7) * Math.hypot(vw, vh);
+                var n = Math.max(k.min, Math.min(k.max, Math.round(len / stride)));
+
+                // карточка закрывает фон: следы стартуют вне её и не рисуются под ней
+                var cr = document.querySelector('.container').getBoundingClientRect();
+                function hidden(px, py) {
+                    return px > cr.left - 6 && px < cr.right + 6 && py > cr.top - 6 && py < cr.bottom + 6;
+                }
+                var x, y, tries = 0;
+                do {
+                    x = rnd(0.03, 0.97) * vw; y = rnd(0.03, 0.97) * vh; tries++;
+                } while (hidden(x, y) && tries < 25);
+                var th = Math.atan2(rnd(0.1, 0.9) * vh - y, rnd(0.1, 0.9) * vw - x);
+                var made = [];
+
+                for (var i = 0; i < n; i++) {
+                    th += rnd(-0.12, 0.12);                       // тропа слегка виляет
+                    var dx = Math.cos(th), dy = Math.sin(th);
+                    x += dx * stride;
+                    y += dy * stride;
+                    var off = (i % 2 ? 1 : -1) * side / 2;        // левая / правая «нога»
+                    var px = x - dy * off, py = y + dx * off;
+                    if (hidden(px, py)) continue;                 // след «за карточкой» не рисуем
+
+                    var el = document.createElement('div');
+                    el.className = 'print';
+                    el.style.width = w + 'px';
+                    el.style.height = h + 'px';
+                    el.style.left = (px - w / 2) + 'px';
+                    el.style.top = (py - h / 2) + 'px';
+                    el.style.transform = 'rotate(' + (th * 180 / Math.PI + 90) + 'deg)';
+                    el.style.animationDelay = (i * k.step) + 'ms';
+                    el.style.setProperty('--life', LIFE + 'ms');
+                    el.innerHTML = '<svg width="100%" height="100%"><use href="#' + k.sym + '"></use></svg>';
+                    layer.appendChild(el);
+                    made.push(el);
+                }
+
+                var total = (n - 1) * k.step + LIFE;
+                setTimeout(function () {
+                    made.forEach(function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
+                }, total + 300);
+                return total;
+            }
+
+            function startTrails() {
+                var layer = document.getElementById('trails');
+                if (!layer || net.awful || net.slow || net.imgSlow || reduceMotion) return;
+
+                // чем больше экран, тем больше одновременных «прохожих» (от 2 до 5)
+                var chains = Math.max(2, Math.min(5, Math.round(window.innerWidth * window.innerHeight / 260000)));
+
+                function run() {
+                    if (document.hidden) { setTimeout(run, 3000); return; }
+                    var total = spawnTrail(layer);
+                    setTimeout(run, total + rnd(1500, 4500));
+                }
+                for (var c = 0; c < chains; c++) setTimeout(run, 400 + c * 2600);
+            }
+
+            if (document.readyState === 'complete') startTrails();
+            else window.addEventListener('load', startTrails);
+        })();
+    </script>
+</body>
+</html>
